@@ -1,2 +1,140 @@
 # Outputs-Model
 How will a zero-fare public transport policy affect motorization rates and other modes of transport in the future?
+globals
+[
+  depreciation
+]
+
+turtles-own
+[
+  age-remaining
+  wealth
+  current-asset
+  income
+  living-cost
+  ability-to-buy
+  probability-to-buy
+  utility-of-buying-a-car
+  own-car
+  car-cost
+  current-car-value
+  risk-buy
+  risk-sell
+]
+
+
+;; Initialization
+
+to setup
+  clear-all                                              ;; clear the world
+
+  set depreciation 0.9                                   ;; set depreciation value of car
+
+  ask patches
+  [
+    set pcolor grey
+    sprout 1                                             ;; create turtles on every patch
+  ]
+
+
+  ask turtles
+  [
+    set age-remaining (10 + random 60)
+    set risk-buy 1.5                                     ;; set turtles braveness of taking risk to buy a car
+    set risk-sell precision random-float 1.0 2           ;; set turtles braveness of taking risk to sell her car
+    set current-asset precision random-float 1.0 2       ;; set turtles asset [0,1]
+    set living-cost precision random-float 1.0 2
+    set wealth current-asset
+    set income precision (random-float 1.0) 2            ;; set turtles income [0,1] uniformly distributed
+    set own-car 0                                        ;; all turtles do not have car in the beginning
+    display-agent
+  ]
+
+  reset-ticks
+end 
+
+
+;; Start Simulation
+
+to go
+  if ticks >= 300 [ stop]
+  ask turtles
+  [
+    ifelse (own-car = 1)
+    [
+      ifelse (current-car-value < risk-sell * buy-price )
+      [ sell-car]
+      [ keep-car]
+    ]
+
+    [
+      let average-asset ((sum [current-asset] of turtles-on neighbors + current-asset) / (count turtles-on neighbors + 1))
+      set ability-to-buy (current-asset - risk-buy * buy-price)
+      set probability-to-buy (1 - exp (- (current-asset - average-asset)))
+      ifelse probability-to-buy < 0
+      [ set probability-to-buy 0]
+      [ set probability-to-buy probability-to-buy]
+      set utility-of-buying-a-car ability-to-buy * probability-to-buy
+
+      ifelse (utility-of-buying-a-car < threshold)                 ;; threshold = utility of not buying a car i.e utility of using public transportation
+      [ use-public-transport]
+      [ buy-car]
+    ]
+
+    set age-remaining (age-remaining - 1)
+    if (wealth <= fare) or (age-remaining <= 0)
+    [
+      ;; agent died and new agent is born i.e reset agent properties
+      set age-remaining (10 + random 60)
+      set risk-sell precision random-float 1.0 2
+      set current-asset precision random-float 1.0 2
+      set living-cost precision random-float 1.0 2
+      set wealth current-asset
+      set income precision (random-float 1.0) 2
+      set own-car 0
+    ]
+  ]
+  ask turtles [display-agent]
+  tick
+end 
+
+to sell-car
+  set own-car own-car - 1
+  let sell-price (0.1 + random-float 0.61) * buy-price
+  set wealth (current-asset + sell-price - current-car-value)
+  set current-asset (current-asset + income + sell-price - living-cost)
+  set current-car-value ""
+end 
+
+to keep-car
+  set own-car own-car
+  set current-car-value (depreciation * current-car-value)
+  set wealth current-asset + current-car-value
+  set current-asset (current-asset + income - car-cost - living-cost)
+end 
+
+to use-public-transport
+  set own-car own-car
+  set wealth current-asset
+  set current-asset (current-asset + income - fare - living-cost)
+end 
+
+to buy-car
+  set own-car own-car + 1
+  set current-car-value (depreciation * buy-price)
+  set wealth (current-asset + current-car-value)
+  set car-cost 0.3 * buy-price
+  set current-asset (current-asset + income - buy-price - living-cost)
+end 
+
+to display-agent
+  set shape "circle"
+  set size 1
+
+  ifelse (own-car = 1)
+  [ set color 94]
+  [ ifelse (current-asset < fare)
+    [set color 98]
+    [set color 96]
+  ]
+end 
